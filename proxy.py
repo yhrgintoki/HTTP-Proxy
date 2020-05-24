@@ -5,22 +5,44 @@ import sys
 import _thread
 
 
-def client(conn, addr):
-    data = conn.recv(4096).decode()
+def client(client_conn, client_addr):
+    data = client_conn.recv(4096).decode()
     headers = data.split('\r\n')
     request = headers[0].split(' ')[0]
-    port = 80
-    host = ""
+    server_port = 80
+    # need to change here
     for header in headers:
-        if header.startswith('Host'):
+        if header.lower().startswith('host'):
             hosts = header.split(':')
             if len(hosts) == 3:
-                port = int(hosts[2])
-            host = hosts[1]
+                server_port = int(hosts[2])
+            server_ip = socket.gethostbyname(hosts[1].strip())
     if request == 'CONNECT':
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+        try:
+            sock.connect((server_ip, server_port))
+            client_conn.send('HTTP/1.0 200 OK\r\n\r\n'.encode())
+        except Exception:
+            client_conn.send('HTTP/1.0 502 Bad Gateway\r\n\r\n'.encode())
+            sock.close()
+            client_conn.close()
+            return
+        while True:
+            request = client_conn.recv(4096)
+            if len(request) == 0:
+                break
+            sock.send(request)
+            response = sock.recv(4096)
+            client_conn.send(response)
+        client_conn.close()
+        sock.close()
     else:
+        data = data.replace('HTTP/1.1', 'HTTP/1.0', 1)
+        data = data.replace('keep-alive', 'close')
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((server_ip, server_port))
+        sock.send(data)
+        response = sock.recv(4096)
 
 
 
@@ -30,15 +52,15 @@ def client(conn, addr):
 if len(sys.argv) != 2:
     print('Wrong number of argument')
     sys.exit()
-port = int(sys.argv[1])
-ip = socket.gethostbyname('localhost')
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.bind((ip, port))
-s.listen(5)
-try:
-    conn, addr = s.accept()
-    _thread.start_new_thread(client, (conn, addr))
-except KeyboardInterrupt:
-    s.close()
-    sys.exit()
-s.close()
+proxy_port = int(sys.argv[1])
+proxy_ip = socket.gethostbyname('localhost')
+proxy_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+proxy_socket.bind((proxy_ip, proxy_port))
+proxy_socket.listen(5)
+while True:
+    try:
+        client_conn, client_addr = proxy_socket.accept()
+        _thread.start_new_thread(client, (client_conn, client_addr))
+    except KeyboardInterrupt:
+        proxy_socket.close()
+        sys.exit()
