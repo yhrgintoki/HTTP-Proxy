@@ -38,12 +38,18 @@ def client(client_conn, client_addr):
             client_conn.close()
             return
         while True:
-            request = client_conn.recv(4096)
+            while True:
+                request = client_conn.recv(1024)
+                sock.send(request)
+                if len(request) < 1024:
+                    break
             if len(request) == 0:
                 break
-            sock.send(request)
-            response = sock.recv(4096)
-            client_conn.send(response)
+            while True:
+                response = sock.recv(1024)
+                client_conn.send(response)
+                if len(response) < 1024:
+                    break
         client_conn.close()
         sock.close()
     else:
@@ -52,10 +58,14 @@ def client(client_conn, client_addr):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((server_ip, server_port))
         sock.send(data)
-        response = sock.recv(4096)
-        client_conn.send(response)
+        while True:
+            response = sock.recv(1024)
+            if len(response) < 1024:
+                break
+            client_conn.send(response)
         client_conn.close()
         sock.close()
+
 
 if len(sys.argv) != 2:
     print('Wrong number of argument')
