@@ -30,30 +30,30 @@ def client(client_con, client_addr):
         if not data:
             client_con.close()
             return
+        headers = data.split('\r\n')
+        print(str(datetime.datetime.now()) + ' - >>> ' + str(headers[0]))
+        request = headers[0].split(' ')[0]
+        server_port = -1
+        server_ip = ''
+        for header in headers:
+            if header.lower().startswith('host'):
+                hosts = header.split(':')
+                if len(hosts) == 3:
+                    server_port = int(hosts[2])
+                server_ip = socket.gethostbyname(hosts[1].strip())
+                break
+        if server_port == -1:
+            uris = headers[0].split(':')
+            if len(uris) == 3:
+                port = uris[2].split(' ')
+                server_port = int(port[0])
+            elif 'https' in headers[0].lower():
+                server_port = 443
+            else:
+                server_port = 80
     except socket.error:
         client_con.close()
         return
-    headers = data.split('\r\n')
-    print(str(datetime.datetime.now()) + ' - >>> ' + str(headers[0]))
-    request = headers[0].split(' ')[0]
-    server_port = -1
-    server_ip = ''
-    for header in headers:
-        if header.lower().startswith('host'):
-            hosts = header.split(':')
-            if len(hosts) == 3:
-                server_port = int(hosts[2])
-            server_ip = socket.gethostbyname(hosts[1].strip())
-            break
-    if server_port == -1:
-        uris = headers[0].split(':')
-        if len(uris) == 3:
-            port = uris[2].split(' ')
-            server_port = int(port[0])
-        elif 'https' in headers[0].lower():
-            server_port = 443
-        else:
-            server_port = 80
     if request == 'CONNECT':
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
