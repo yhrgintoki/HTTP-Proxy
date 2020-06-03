@@ -8,15 +8,25 @@ import _thread
 def client(client_conn, client_addr):
     data = client_conn.recv(4096).decode()
     headers = data.split('\r\n')
+    print(headers[0])
     request = headers[0].split(' ')[0]
-    server_port = 80
-    # need to change here
+    server_port = -1
     for header in headers:
         if header.lower().startswith('host'):
             hosts = header.split(':')
             if len(hosts) == 3:
                 server_port = int(hosts[2])
             server_ip = socket.gethostbyname(hosts[1].strip())
+            break
+    if server_port == -1:
+        uris = headers[0].split(':')
+        if len(uris) == 3:
+            port = uris[2].split(' ')
+            server_port = int(port[0])
+        elif 'https' in headers[0]:
+            server_port = 443
+        else:
+            server_port = 80
     if request == 'CONNECT':
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
@@ -43,11 +53,9 @@ def client(client_conn, client_addr):
         sock.connect((server_ip, server_port))
         sock.send(data)
         response = sock.recv(4096)
-
-
-
-
-
+        client_conn.send(response)
+        client_conn.close()
+        sock.close()
 
 if len(sys.argv) != 2:
     print('Wrong number of argument')
